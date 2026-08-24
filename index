@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="말씀암송">
+    <title>아버님의 말씀 암송 노트</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <style>
+        :root { --base-size: 24px; }
+        body { 
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; 
+            font-size: var(--base-size); 
+            text-align: center; 
+            padding: 20px; 
+            background-color: #f4f6f8; 
+            margin: 0;
+            user-select: none;
+        }
+        
+        .screen { display: none; }
+        .screen.active { display: block; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .controls span { font-weight: bold; color: #555; font-size: 0.9em; }
+        .btn-control { 
+            font-size: 0.8em; font-weight: bold; padding: 8px 15px; 
+            background-color: #fff; border: 2px solid #ccc; border-radius: 8px; cursor: pointer; 
+        }
+        .btn-control:active { background-color: #eee; }
+        .btn-back { background-color: #34495e; color: white; border: none; font-size: 0.9em; padding: 10px 20px; border-radius: 10px; font-weight: bold; }
+
+        .menu-title { font-weight: bold; font-size: 1.4em; color: #2c3e50; margin-bottom: 15px; }
+        
+        .mode-tabs { display: flex; gap: 10px; margin-bottom: 25px; }
+        .btn-mode {
+            flex: 1; padding: 15px 0; font-size: 1.05em; font-weight: bold; 
+            border-radius: 12px; border: none; cursor: pointer;
+            background-color: #e0e6ed; color: #7f8c8d; transition: all 0.2s;
+        }
+        .btn-mode.active { 
+            background-color: #2980b9; color: white; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2); 
+        }
+
+        .verse-list { display: flex; flex-direction: column; gap: 15px; }
+        
+        .verse-item {
+            background-color: white; border-radius: 15px; padding: 20px;
+            font-size: 1.1em; font-weight: bold; color: #2c3e50;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); cursor: pointer; border: none;
+            transition: transform 0.1s; text-align: center; line-height: 1.4;
+        }
+        .verse-item:active { transform: scale(0.98); background-color: #f0f0f0; }
+
+        .read-item {
+            background-color: white; border-radius: 15px; padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: left;
+        }
+        .read-title { font-size: 1.05em; font-weight: bold; color: #e67e22; margin-bottom: 10px; border-bottom: 2px solid #f9e79f; padding-bottom: 8px;}
+        .read-text { font-size: 1.1em; color: #333; line-height: 1.6; font-weight: bold; word-break: keep-all;}
+
+        .game-title { font-weight: bold; font-size: 1.3em; margin-bottom: 15px; color: #2c3e50; line-height: 1.4; }
+        
+        .btn-hint {
+            font-size: 0.8em; padding: 10px 20px; background-color: #9b59b6;
+            color: white; border: none; border-radius: 10px; cursor: pointer;
+            font-weight: bold; margin-bottom: 20px; box-shadow: 0 3px 5px rgba(0,0,0,0.1);
+        }
+        .btn-hint:active { transform: scale(0.95); }
+        .hint-box {
+            display: none; background-color: #fff3cd; color: #856404;
+            padding: 15px; border-radius: 10px; margin-bottom: 25px;
+            font-weight: bold; font-size: 1.1em; line-height: 1.5; border: 2px dashed #ffeeba; word-break: keep-all;
+        }
+
+        .target-area { 
+            min-height: 120px; border: 3px dashed #bdc3c7; border-radius: 15px; 
+            padding: 20px; margin-bottom: 30px; background-color: white; 
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; align-items: center;
+        }
+        .pool-area { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+
+        button.word-btn, button.target-btn { 
+            font-size: 1em; font-weight: bold; padding: 12px 20px; 
+            border-radius: 12px; border: none; cursor: pointer; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s;
+        }
+        button.word-btn:active, button.target-btn:active { transform: scale(0.95); }
+        .word-btn { background-color: #27ae60; color: white; }
+        .target-btn { background-color: #2980b9; color: white; }
+
+        .message { font-size: 1.3em; color: #e74c3c; font-weight: bold; margin-top: 20px; display: none; line-height: 1.5;}
+        .restart-btn { 
+            font-size: 0.9em; padding: 12px 25px; background-color: #f39c12; 
+            color: white; border: none; border-radius: 10px; margin-top: 15px; cursor: pointer; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="menu-screen" class="screen active">
+        <div class="header">
+            <div class="controls">
+                <button class="btn-control" onclick="changeSize(2)">글씨 ＋</button>
+                <button class="btn-control" onclick="changeSize(-2)">글씨 －</button>
+            </div>
+        </div>
+        <div class="menu-title">📖 아버님의 성경 노트</div>
+        
+        <div class="mode-tabs">
+            <button class="btn-mode active" id="btn-tab-game" onclick="setMode('game')">🧩 암송 게임</button>
+            <button class="btn-mode" id="btn-tab-read" onclick="setMode('read')">📖 전체 읽기</button>
+        </div>
+
+        <div class="verse-list" id="game-list"></div>
+        <div class="verse-list" id="read-list" style="display: none;"></div>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <div class="header">
+            <button class="btn-control btn-back" onclick="showMenu()">◀ 목록으로</button>
+            <div class="controls">
+                <button class="btn-control" onclick="changeSize(2)">글씨 ＋</button>
+                <button class="btn-control" onclick="changeSize(-2)">글씨 －</button>
+            </div>
+        </div>
+        
+        <div class="game-title" id="game-title">말씀 제목</div>
+        
+        <button class="btn-hint" onclick="toggleHint()">👀 힌트 보기</button>
+        <div id="hint-box" class="hint-box"></div>
+
+        <div class="target-area" id="target"></div>
+        <div class="pool-area" id="pool"></div>
+
+        <div class="message" id="message">
+            🎉 아멘! 참 잘하셨습니다! 🎉<br>
+            <button class="restart-btn" onclick="initGame()">다시 하기 ↻</button>
+        </div>
+    </div>
+
+    <script>
+        const verseDatabase = [
+            { title: "요한복음 10:35", words: ["하나님의 말씀을", "받은 사람들은", "폐하지 못하나니"] },
+            { title: "요한복음 11:35", words: ["예수께서", "눈물을", "흘리시더라"] },
+            { title: "요한복음 14:6", words: ["내가 곧 길이요", "진리요 생명이니", "나로 말미암지 않고는", "아버지께로 올 자가", "없느니라"] },
+            { title: "사도행전 5:29", words: ["사람보다", "하나님께 순종하는 것이", "마땅하니라"] },
+            { title: "사도행전 6:4", words: ["우리는 오로지", "기도하는 일과", "말씀 사역에", "힘쓰리라"] },
+            { title: "사도행전 13:22", words: ["내 마음에", "맞은 사람", "다윗을 만나니"] },
+            { title: "로마서 8:6", words: ["육신의 생각은", "사망이요", "영의 생각은", "생명과 평안이니라"] },
+            { title: "고린도전서 13:13", words: ["그런즉 믿음 소망 사랑", "이 세 가지는", "항상 있을 것인데", "그 중의 제일은", "사랑이라"] },
+            { title: "디모데전서 6:10", words: ["돈을 사랑함이", "일만 악의", "뿌리가 되나니"] },
+            { title: "디모데후서 3:4", words: ["쾌락을 사랑하기를", "하나님 사랑하는 것보다", "더하며"] },
+            { title: "디모데후서 3:16", words: ["모든 성경은", "하나님의 감동으로", "된 것으로"] },
+            { title: "야고보서 1:15", words: ["욕심이 잉태한즉", "죄를 낳고"] },
+            { title: "야고보서 2:17, 26", words: ["행함이 없는", "믿음은", "죽은 것이니라"] },
+            { title: "야고보서 5:15", words: ["의인의 간구는", "역사하는 힘이", "큼이니라"] },
+            { title: "요한일서 5:8", words: ["성령과 물과 피라", "또한 이 셋은", "합하여 하나이니라"] },
+            { title: "요한계시록 8:3", words: ["성도의 기도들은", "향이라"] },
+            { title: "요한계시록 19:13", words: ["또 그가 피뿌린 옷을", "입었는데", "그 이름은", "하나님의 말씀이라 하더라"] },
+            { title: "마태복음 9:38", words: ["추수할 일꾼들을", "보내 주소서 하라"] },
+            { title: "마태복음 10:30", words: ["너희에게는", "머리털까지 다", "세신 바 되었나니"] },
+            { title: "마태복음 12:8", words: ["인자는", "안식일의", "주인이니라"] },
+            { title: "마태복음 17:5", words: ["이는 내 사랑하는 아들이요", "내 기뻐하는 자니", "너희는 그의 말을 들으라"] },
+            { title: "마태복음 17:20", words: ["만일 믿음이", "겨자씨 한 알 만큼만", "있어도"] },
+            { title: "마태복음 26:39", words: ["나의 원대로 마시옵고", "아버지의 원대로", "하옵소서"] },
+            { title: "마태복음 28:20", words: ["볼지어다 내가 세상 끝날까지", "너희와 항상 함께", "있으리라 하시니라"] },
+            { title: "마가복음 1:11", words: ["너는 내", "사랑하는 아들이라", "내가 너를 기뻐하노라"] },
+            { title: "마가복음 1:35", words: ["새벽 아직도 밝기 전에", "예수께서 일어나 나가", "한적한 곳으로 가사", "거기서 기도하시더니"] },
+            { title: "마가복음 9:23", words: ["할 수 있거든이 무슨 말이냐", "믿는 자에게는", "능히 하지 못할 일이 없느니라"] },
+            { title: "마가복음 9:29", words: ["기도 외에", "다른 것으로는", "이런 종류가 나갈 수 없느니라"] },
+            { title: "마가복음 10:45", words: ["인자가 온 것은", "섬김을 받으려 함이 아니라", "도리어 섬기려 하고"] },
+            { title: "누가복음 10:2", words: ["추수할 일꾼이 많으니", "추수할 주인에게 청하여", "일꾼들을 보내 주소서 하라"] },
+            { title: "누가복음 11:28", words: ["하나님의 말씀을 듣고", "지키는 자가", "복이 있느니라"] },
+            { title: "누가복음 16:17", words: ["율법의 한 점이 떨어짐보다", "천지가 없어짐이", "더 쉬우니라"] },
+            { title: "누가복음 19:46", words: ["내 집은", "기도하는 집이", "되리라 하였거늘"] },
+            { title: "요한복음 1:12", words: ["영접하는 자", "곧 그 이름을 믿는 자들에게는", "하나님의 자녀가 되는 권세를 주셨으니"] },
+            { title: "이사야 49:16", words: ["내가 너를", "내 손바닥에", "새겼고"] },
+            { title: "이사야 56:7", words: ["내 집은", "만민이 기도하는 집이라", "일컬음이 될 것임이라"] },
+            { title: "이사야 66:23", words: ["모든 혈육이", "내 앞에 나아와", "예배하리라"] },
+            { title: "예레미야 20:12", words: ["의인을 시험하사", "폐부와 심장을", "보시는"] },
+            { title: "예레미야 23:23", words: ["나는 가운데에 있는", "하나님이냐"] },
+            { title: "예레미야애가 3:27", words: ["사람은 젊었을 때에", "멍에를 메는 것이", "좋으니라"] },
+            { title: "에스겔 3:3", words: ["네 배에", "채우며"] },
+            { title: "에스겔 14:14", words: ["비록 노아 다니엘 욥", "이 세 사람이", "거기에 있을지라도"] },
+            { title: "에스겔 37:1~6", words: ["마른 뼈들이", "살아나고"] },
+            { title: "호세아 6:3", words: ["그러므로 우리가 여호와를 알자", "힘써 여호와를", "알자"] },
+            { title: "호세아 6:6", words: ["나는 인애를 원하고", "제사를 원하지", "아니하며"] },
+            { title: "요엘 2:28", words: ["너희의 자녀들은", "예언할 것이며"] },
+            { title: "아모스 8:11", words: ["양식을 찾아 볼 수 없는", "기갈이 아니라"] },
+            { title: "하박국 3:18", words: ["나는 여호와로 말미암아", "즐거워하며"] },
+            { title: "스바냐 3:17", words: ["너의 하나님 여호와가", "너의 가운데에", "계시니"] },
+            { title: "열왕기상 13:4", words: ["여로보암 왕이"] },
+            { title: "열왕기하 1:10", words: ["엘리야가 오십부장에게", "이르되"] },
+            { title: "욥기 2:3", words: ["그가 여전히", "자기의 온전을", "굳게 지켰느니라"] },
+            { title: "욥기 4:6", words: ["네 경외함이", "네 소망이", "아니냐"] },
+            { title: "욥기 5:8", words: ["나라면", "하나님을 찾겠고"] },
+            { title: "욥기 5:17", words: ["하나님에게 징계 받는 자는", "복이 있나니"] },
+            { title: "욥기 22:21", words: ["너는 하나님과 화목하고", "평안하라"] },
+            { title: "욥기 23:12", words: ["정한 음식보다", "그의 입의 말씀을", "귀히 여겼도다"] },
+            { title: "욥기 27:3", words: ["하나님의", "숨결이"] },
+            { title: "시편 18:21", words: ["내가 여호와의 도를", "지키고"] },
+            { title: "예레미야 3:19", words: ["너를 아들들 중에", "두며"] },
+            { title: "시편 73:25", words: ["하늘에서는", "주 외에 누가", "내게 있으리요"] },
+            { title: "잠언 13:13", words: ["말씀을 멸시하는 자는", "패망을 이루고"] },
+            { title: "잠언 15:16", words: ["가산이 적어도", "여호와를 경외하는 것이"] },
+            { title: "잠언 16:33", words: ["제비는", "사람이 뽑으나"] },
+            { title: "잠언 19:23", words: ["여호와를 경외하는 것은"] },
+            { title: "이사야 28:9", words: ["제사장과 선지자도", "독주로 말미암아"] },
+            { title: "출애굽기 20:8", words: ["안식일을 기억하여", "거룩하게", "지키라"] },
+            { title: "민수기 6:24~26", words: ["여호와는 네게 복을 주시고", "너를 지키시기를", "원하며"] },
+            { title: "민수기 27:18", words: ["여호수아", "그 안에 영이 머무는 자"] },
+            { title: "신명기 1:36", words: ["오직 여분네의 아들", "갈렙은"] },
+            { title: "신명기 6:5", words: ["너는 마음을 다하고", "뜻을 다하고", "힘을 다하여", "네 하나님 여호와를 사랑하라"] },
+            { title: "신명기 5:10", words: ["나를 사랑하고", "계명을 지키는 자에게는", "천 대까지 은혜를 베푸느니라"] },
+            { title: "신명기 17:19", words: ["평생에 자기 옆에 두고", "읽어"] },
+            { title: "마가복음 12:30", words: ["네 마음을 다하고 목숨을 다하고", "뜻을 다하고", "힘을 다하여"] },
+            { title: "신명기 30:20", words: ["네 하나님 여호와를", "사랑하고"] },
+            { title: "여호수아 1:8", words: ["이 율법책을", "네 입에서 떠나지", "말게 하며"] },
+            { title: "요한일서 5:6", words: ["예수께서는 물과 피로", "임하신 이시니"] },
+            { title: "빌립보서 2:5", words: ["너희 안에 이 마음을 품으라", "곧 그리스도 예수의", "마음이니"] },
+            { title: "빌립보서 4:4", words: ["주 안에서", "항상 기뻐하라"] },
+            { title: "빌립보서 4:13", words: ["내게 능력 주시는 자 안에서", "내가 모든 것을", "할 수 있느니라"] },
+            { title: "골로새서 4:2", words: ["기도를 계속하고", "기도의 감사함으로", "깨어 있으라"] },
+            { title: "디모데전서 5:6", words: ["쾌락을 좋아하는 자는", "살아 있으나", "죽은 것이니라"] },
+            { title: "히브리서 13:8", words: ["예수 그리스도는", "어제나 오늘이나", "영원토록 동일하시니라"] },
+            { title: "야고보서 4:7", words: ["마귀를 대적하라", "그리하면", "너희를 피하리라"] },
+            { title: "요한일서 5:21", words: ["자녀들아 너희 자신을 지켜", "우상에게서", "멀리하라"] },
+            { title: "요한계시록 8:3~5", words: ["성도의 기도", "향이 하나님 앞에", "올라가는지라"] },
+            { title: "출애굽기 12:13", words: ["내가 피를 볼 때에", "너희를", "넘어가리니"] },
+            { title: "출애굽기 13:22", words: ["낮에는 구름 기둥", "밤에는 불 기둥이"] },
+            { title: "출애굽기 20:4", words: ["너를 위하여", "새긴 우상을", "만들지 말라"] },
+            { title: "출애굽기 20:6", words: ["나를 사랑하고 계명을 지키는 자에게는", "천 대까지", "은혜를 베푸느니라"] },
+            { title: "욥기 14:16", words: ["나의 걸음을", "세시오니"] },
+            { title: "시편 119:56", words: ["내 소유는 이것이니", "곧 주의 법도들을", "지킨 것이니이다"] },
+            { title: "시편 127:2", words: ["사랑하시는 자에게는", "잠을", "주시는도다"] },
+            { title: "시편 46:8", words: ["그가 땅을", "황폐하게", "하실지니"] },
+            { title: "시편 139:17", words: ["하나님이여 주의 생각이", "내게 어찌 그리", "보배로우신지요"] },
+            { title: "잠언 12:27", words: ["부지런한 것은", "사람의 보배니라"] },
+            { title: "잠언 18:22", words: ["아내를 얻는자는", "복을 얻고"] },
+            { title: "이사야 43:2", words: ["이 백성은", "내가 나를 위하여", "지었나니"] },
+            { title: "이사야 45:3", words: ["네게 은밀한 보물과", "숨은 재물을", "주어"] },
+            { title: "이사야 58:3", words: ["금식할", "때에"] },
+            { title: "이사야 66:2", words: ["무릇 마음이 가난하고", "심령에", "통회하며"] },
+            { title: "예레미야 2:19", words: ["네 속에", "나를 경외함이 없는 것이", "악이요"] },
+            { title: "예레미야 23:11", words: ["선지자와 제사장이", "다 사악한지라"] },
+            { title: "예레미야 48:10", words: ["여호와의 일을 태만히 하는 자는", "저주를 받을", "것이요"] },
+            { title: "데살로니가전서 5:16~18", words: ["항상 기뻐하라", "쉬지 말고 기도하라", "범사에 감사하라"] },
+            { title: "데살로니가후서 3:10", words: ["누구든지 일하기 싫어하거든", "먹지도 말게", "하라"] },
+            { title: "히브리서 13:15", words: ["항상 찬송의 제사를", "하나님께", "드리자"] },
+            { title: "창세기 48:15", words: ["지금까지", "기르신", "하나님"] },
+            { title: "출애굽기 39:23", words: ["옷의 깃을 짜서", "찢어지지", "않게 하고"] },
+            { title: "레위기 17:11", words: ["피가", "죄를", "속하느니라"] },
+            { title: "신명기 4:8", words: ["네 마음을", "지키라"] },
+            { title: "신명기 5:12", words: ["안식일을 기억하여", "거룩하게", "지키라"] },
+            { title: "신명기 7:9", words: ["계명을 지키는 자에게는", "언약을", "이행하시며"] },
+            { title: "신명기 10:17", words: ["신 가운데의", "신이시며"] },
+            { title: "역대상 16:4", words: ["여호와의 궤 앞에서", "섬기며"] },
+            { title: "역대상 16:11", words: ["그의 능력을", "구할지라"] },
+            { title: "역대하 7:16", words: ["내 눈과 내 마음이", "항상 여기에", "있으리니"] },
+            { title: "요한복음 1:1", words: ["태초에 말씀이 계시니라", "이 말씀이 하나님과", "함께 계셨으니"] },
+            { title: "요한복음 6:29", words: ["하나님께서 보내신 이를", "믿는 것이", "하나님의 일이니라"] },
+            { title: "요한복음 6:35", words: ["나는", "생명의", "떡이니"] },
+            { title: "요한복음 6:40", words: ["내 아버지의 뜻은", "아들을 보고 믿는 자마다", "영생을 얻는 이것이니"] },
+            { title: "사도행전 7:22", words: ["모세가 모든 지혜를", "배워"] },
+            { title: "로마서 14:23", words: ["믿음을 따라 하지 아니하는 것은", "다", "죄니라"] },
+            { title: "갈라디아서 3:26", words: ["너희가 다 믿음으로 말미암아", "그리스도 예수 안에서", "하나님의 아들이 되었으니"] },
+            { title: "갈라디아서 3:27", words: ["누구든지 그리스와 연합하기 위하여", "세례를", "받은 자는"] },
+            { title: "갈라디아서 6:17", words: ["내 몸에", "예수의 흔적을", "지니고 있노라"] },
+            { title: "에베소서 4:5", words: ["주도 한 분이시요", "믿음도 하나요", "세례도 하나요"] },
+            { title: "골로새서 3:5", words: ["정욕과 탐심은", "우상", "숭배니라"] },
+            { title: "에스겔 42:14", words: ["제사장의 의복은", "거룩함으로"] },
+            { title: "에스겔 48:35", words: ["그 성읍의 이름을", "여호와 삼마라", "하리라"] },
+            { title: "요엘 3:10", words: ["약한 자는 이르기를", "나는 강하다", "할지어다"] },
+            { title: "학개 2:8", words: ["은도 내 것이요", "금도", "내 것이니라"] },
+            { title: "스가랴 4:6", words: ["오직 나의 영으로", "되느니라"] },
+            { title: "말라기 3:7~10", 코ds: ["십일조는", "하나님의", "것"] },
+            { title: "마가복음 11:21", words: ["믿음이 있고", "의심하지", "아니하면"] },
+            { title: "마가복음 1:31", words: ["나아가사", "그 손을 잡아", "일으키시니"] },
+            { title: "마가복음 2:28", words: ["이러므로 인자는", "안식일에도", "주인이니라"] },
+            { title: "마가복음 4:14", words: ["뿌리는 자는", "말씀을", "뿌리는 것이라"] },
+            { title: "마가복음 11:17", words: ["내 집은 만민이 기도하는 집이라", "칭함을", "받으리라"] },
+            { title: "마가복음 13:27", words: ["택하신 자들을", "땅 끝에서 하늘 끝까지", "모으시리라"] },
+            { title: "마가복음 13:31", words: ["천지는 없어지겠으나", "내 말은 없어지지", "아니하리라"] },
+            { title: "누가복음 8:11", words: ["이 비유는 이러하니라", "말씀은", "하나님의 씨요"] },
+            { title: "누가복음 22:32", words: ["믿음이 떨어지지 않기를", "내가", "기도하였노니"] }
+        ];
+
+        let currentSize = 24; 
+        let currentVerseIndex = 0;
+        let correctOrder = [];
+        let currentWords = [];
+        let poolWords = [];
+        let hintTimer; // 💡 5초 타이머용 변수 추가
+
+        function changeSize(delta) {
+            currentSize += delta;
+            if (currentSize < 16) currentSize = 16; 
+            if (currentSize > 40) currentSize = 40; 
+            document.documentElement.style.setProperty('--base-size', currentSize + 'px');
+        }
+
+        function setMode(mode) {
+            if(mode === 'game') {
+                document.getElementById('game-list').style.display = 'flex';
+                document.getElementById('read-list').style.display = 'none';
+                document.getElementById('btn-tab-game').classList.add('active');
+                document.getElementById('btn-tab-read').classList.remove('active');
+            } else {
+                document.getElementById('game-list').style.display = 'none';
+                document.getElementById('read-list').style.display = 'flex';
+                document.getElementById('btn-tab-game').classList.remove('active');
+                document.getElementById('btn-tab-read').classList.add('active');
+            }
+        }
+
+        function buildMenu() {
+            const gameListDiv = document.getElementById('game-list');
+            const readListDiv = document.getElementById('read-list');
+            gameListDiv.innerHTML = '';
+            readListDiv.innerHTML = '';
+
+            verseDatabase.forEach((verse, index) => {
+                const gameBtn = document.createElement('button');
+                gameBtn.className = 'verse-item';
+                gameBtn.innerText = verse.title;
+                gameBtn.onclick = () => openGame(index);
+                gameListDiv.appendChild(gameBtn);
+
+                const readItem = document.createElement('div');
+                readItem.className = 'read-item';
+                readItem.innerHTML = `<div class="read-title">${verse.title}</div><div class="read-text">${verse.words.join(" ")}</div>`;
+                readListDiv.appendChild(readItem);
+            });
+        }
+
+        function showMenu() {
+            document.getElementById('game-screen').classList.remove('active');
+            document.getElementById('menu-screen').classList.add('active');
+        }
+
+        function openGame(index) {
+            currentVerseIndex = index;
+            document.getElementById('menu-screen').classList.remove('active');
+            document.getElementById('game-screen').classList.add('active');
+            document.getElementById('game-title').innerText = "📖 " + verseDatabase[index].title;
+            correctOrder = verseDatabase[index].words;
+            initGame();
+        }
+
+        function shuffle(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex != 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        function initGame() {
+            currentWords = [];
+            poolWords = shuffle([...correctOrder]);
+            document.getElementById('message').style.display = 'none';
+            document.getElementById('hint-box').style.display = 'none';
+            
+            // 💡 게임 시작 시 타이머 초기화
+            if (hintTimer) clearTimeout(hintTimer); 
+            
+            render();
+        }
+
+        // 💡 5초 뒤에 자동으로 꺼지는 힌트 기능으로 업그레이드
+        function toggleHint() {
+            const hintBox = document.getElementById('hint-box');
+            
+            // 기존에 작동 중이던 타이머 취소
+            if (hintTimer) clearTimeout(hintTimer);
+
+            if (hintBox.style.display === 'block') {
+                hintBox.style.display = 'none';
+            } else {
+                hintBox.innerText = correctOrder.join(" ");
+                hintBox.style.display = 'block';
+                
+                // 5초(5000ms) 뒤에 화면에서 힌트 박스 숨기기
+                hintTimer = setTimeout(() => {
+                    hintBox.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function moveToTarget(word, index) {
+            poolWords.splice(index, 1);
+            currentWords.push(word);
+            render();
+            checkWin();
+        }
+
+        function moveToPool(word, index) {
+            currentWords.splice(index, 1);
+            poolWords.push(word);
+            render();
+        }
+
+        function render() {
+            const targetDiv = document.getElementById('target');
+            const poolDiv = document.getElementById('pool');
+            
+            targetDiv.innerHTML = '';
+            poolDiv.innerHTML = '';
+
+            if(currentWords.length === 0) {
+                targetDiv.innerHTML = '<span style="color:#999; font-size: 0.8em;">아래 말씀 조각을 순서대로 눌러보세요</span>';
+            } else {
+                currentWords.forEach((word, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'target-btn';
+                    btn.innerText = word;
+                    btn.onclick = () => moveToPool(word, index);
+                    targetDiv.appendChild(btn);
+                });
+            }
+
+            poolWords.forEach((word, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'word-btn';
+                btn.innerText = word;
+                btn.onclick = () => moveToTarget(word, index);
+                poolDiv.appendChild(btn);
+            });
+        }
+
+        function playSuccessSound() {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return; 
+            const ctx = new AudioContext();
+            const notes = [659.25, 830.61, 987.77]; 
+            let startTime = ctx.currentTime;
+
+            notes.forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                osc.type = 'sine'; 
+                osc.frequency.value = freq;
+                osc.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                osc.start(startTime + i * 0.15); 
+                gainNode.gain.setValueAtTime(0.5, startTime + i * 0.15);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + i * 0.15 + 0.5);
+                osc.stop(startTime + i * 0.15 + 0.5);
+            });
+        }
+
+        function checkWin() {
+            if (currentWords.length === correctOrder.length) {
+                let isWin = true;
+                for (let i = 0; i < correctOrder.length; i++) {
+                    if (currentWords[i] !== correctOrder[i]) isWin = false;
+                }
+                if (isWin) {
+                    document.getElementById('message').style.display = 'block';
+                    document.getElementById('pool').innerHTML = ''; 
+                    playSuccessSound();
+                }
+            }
+        }
+
+        buildMenu();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>
